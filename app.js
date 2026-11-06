@@ -145,7 +145,7 @@
     closeLiveDialog(false); render(); scrollTo(0, 0);
   }
   function render() {
-    $("nav-title").textContent = "Grok Bot ›";
+    $("nav-title").textContent = "US Metals Desk";
     document.querySelectorAll(".tab").forEach(b => b.classList.toggle("on", b.dataset.tab === S.tab && !S.screen));
     $("nav-avatar").textContent = (handle()[0] || "V").toUpperCase();
     $("nav-back").hidden = !S.screen;
