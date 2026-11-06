@@ -51,7 +51,7 @@
 
   const S = {
     loaded: false, error: null, lastGood: null, lastSuccess: null, nextPoll: 0, poll: 60, connecting: false,
-    state: null, chart: null, activity: null, account: null, settings: null, decisions: {},
+    state: null, morning: null, chart: null, activity: null, account: null, settings: null, decisions: {},
     range: "LIVE", tab: "home", screen: null, screenRequest: 0, liveDialog: false,
   };
   let built = null;
@@ -93,13 +93,13 @@
     try {
       const st = await get("state.json");
       S.poll = finite(st.poll_seconds) ? Math.max(15, Number(st.poll_seconds)) : 60;
-      const [ch, act, acc, set, ...dec] = await Promise.all([
+      const [ch, act, acc, set, morning, ...dec] = await Promise.all([
         get(`chart/${S.range}.json`).catch(() => get("chart.json")),
-        get("activity.json"), get("account.json"), get("settings.json"),
+        get("activity.json"), get("account.json"), get("settings.json"), optional("morning.json"),
         ...AGENTS.map(a => optional(`agents/${a}/decisions.json`)),
       ]);
       AGENTS.forEach((a, i) => { S.decisions[a] = (dec[i] && (dec[i].decisions || dec[i].items)) || []; });
-      Object.assign(S, { state: st, chart: ch, activity: act, account: acc, settings: set, loaded: true, error: null });
+      Object.assign(S, { state: st, chart: ch, activity: act, account: acc, settings: set, morning, loaded: true, error: null });
       const hb = Number(st.heartbeat_ts != null ? st.heartbeat_ts : st.heartbeat);
       if (Number.isFinite(hb)) S.lastGood = hb > 1e12 ? hb / 1000 : hb;
       S.lastSuccess = Date.now() / 1000;
@@ -167,6 +167,7 @@
     if (S.tab === "home") renderHome();
     else if (S.tab === "agents") renderAgents();
     else if (S.tab === "activity") renderActivity();
+    else if (S.tab === "morning") renderMorning();
     else if (S.tab === "account") renderAccount();
   }
 
@@ -236,6 +237,7 @@
         <div class="today" id="today"></div><div class="chart-wrap"><canvas class="line" id="line"></canvas><div class="chart-empty" id="chart-empty" hidden></div></div>
         <div class="ranges">${RANGES.map(r => `<button data-range="${r}" class="${S.range === r ? "on" : ""}">${r}</button>`).join("")}</div>
         <div class="mark-key"><span class="blue">● Bought</span><span class="green">● Sold</span><span class="red">● Stopped</span></div>
+        <div class="fcard morning-home"><button class="link" data-tab="morning"><div class="section-h"><span>Morning</span><span class="chevron">›</span></div></button><div id="morning-home"></div></div>
         <div class="section-h"><span>Agents</span></div><div class="carousel" id="carousel"></div>
         <div class="section-h"><span>Activity</span><button data-go="activity">See all</button></div><ul class="rows" id="home-act"></ul></div>`;
       built = "home";
@@ -251,9 +253,31 @@
     const scroll = $("carousel").scrollLeft;
     $("carousel").innerHTML = AGENTS.map(agentCard).join(""); $("carousel").scrollLeft = scroll;
     const ring = $("ring"); if (ring) DeskChart.ring(ring, ring.dataset.score === "" ? null : Number(ring.dataset.score), ring.dataset.pass === "true");
+    const m = S.morning;
+    $("morning-home").innerHTML = m ? `<div class="t">${esc(m.session_date || m.report_date)} · ${esc(m.mode || "PAPER")}</div><p class="sec">${money(m.stack)} · PnL ${money(m.pnl_usd)} · trades ${esc(m.trades ?? "–")} · W/L ${esc(m.wins)}/${esc(m.losses)}</p><p class="green">Box report · Open the desk app; your private connection remains on this device.</p>` : `<p class="sec">Your daily 08:00 report will appear here.</p>`;
     const items = rows().slice(0,5);
     $("home-act").innerHTML = items.length ? items.map(actRow).join("") : `<li class="empty">No activity yet — Scanner decisions will appear here</li>`;
   }
+  function renderMorning() {
+    built = null;
+    if (!S.loaded) { view.innerHTML = loadingCards(4); return; }
+    const m = S.morning;
+    if (!m) {
+      view.innerHTML = emptyPage("Morning", "The desk box will post your first automatic report at 08:00 Europe/Amsterdam. No private link or key is stored in it."); return;
+    }
+    const rejects = (m.top_rejects || []).map(r => `<li class="row"><div class="main"><div class="t">${esc(r.reason)}</div></div><span class="sec">${esc(r.count)}</span></li>`).join("");
+    view.innerHTML = `<div class="page"><div class="section-h"><span>Morning</span>${isPaper() ? '<span class="badge-paper">PAPER</span>' : ""}</div>
+      <p class="sec">${esc(m.session_date || m.report_date)} · ${esc(m.generated_at || m.report_date)}</p>
+      <h1 class="morning-balance">${money(m.stack)}</h1><p class="sec">Stack · ${esc(m.mode || "PAPER")}</p>
+      <div class="group"><div class="row"><div class="main"><div class="t">Today PnL</div></div><span class="${clsPnl(m.pnl_usd)}">${money(m.pnl_usd)} · ${pct(m.pnl_pct)}</span></div>
+      ${setRow("Trades", m.trades)}${setRow("Win / loss", `${m.wins} / ${m.losses}`)}${setRow("Kill switch", m.kill_switch)}</div>
+      <div class="section-h"><span>Top rejects</span></div><ul class="rows">${rejects || '<li class="empty">none today</li>'}</ul>
+      <p class="note">Metals bucket cap ${esc(m.metals_bucket_pct)}% · share-size rules unchanged for fractional sizing.</p>
+      <div class="group"><p>${esc(m.text || m.report_text || "Box report complete")}</p></div>
+      <p class="green">Generated on the box and delivered via its box scheduler.</p>
+      <p class="note">Open the desk app on your phone. No private connection information is contained here.</p></div>`;
+  }
+
   function activityRoute(it) {
     const reject = /reject/i.test(it.title || "") || it.kind === "audit";
     if (reject && it.symbol) return `data-audit="${esc(it.symbol)}"`;
@@ -318,7 +342,7 @@
       <div class="row"><div class="main"><div class="t">Hosting</div><div class="s">Encrypted data branch; chat-controlled settings</div></div><span class="sec">Plan ${esc(acc.plan || "B")}</span></div></div>
       ${settingGroup("Desk", set.desk)}${settingGroup("Data", set.data)}${settingGroup("Session", set.session_windows)}
       ${settingGroup("Scanner", set.scanner)}${settingGroup("Auditor", set.auditor)}${settingGroup("Analyst", set.analyst)}
-      ${settingGroup("Executor", set.executor)}${settingGroup("Risk", set.risk)}
+      ${settingGroup("Executor", set.executor)}${settingGroup("Risk", set.risk)}${settingGroup("Health", set.health)}
       ${settingGroup("This device", {})}
       <div class="group"><button class="row link" data-act="reconnect"><div class="main"><div class="t">Connect another device</div><div class="s">Paste a private desk link; does not erase this link</div></div><span class="chevron">›</span></button>
       <button class="row link" data-act="forget"><div class="main"><div class="t red">Forget this device</div><div class="s">Remove the saved private link from this browser</div></div></button></div>

@@ -1,5 +1,5 @@
 // Service worker: caches the app shell only. Desk data (d/...) is never cached.
-const SHELL = "us-metals-shell-v9";
+const SHELL = "us-metals-shell-v10";
 const FILES = ["./", "index.html", "app.css", "app.js", "desk-connection.js", "chart.js", "manifest.json",
   "icons/apple-touch-icon.png", "icons/icon-512.png"];
 self.addEventListener("install", e => e.waitUntil(

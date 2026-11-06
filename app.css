@@ -282,3 +282,6 @@ a.btn{height:52px}
 #connect-form .btn{margin-top:16px}
 #connect-form .btn:disabled{opacity:.55}
 #desk-link:disabled{opacity:.55}
+
+/* STEP 12 box-generated Morning tab. No connection data in content. */
+.morning-home{margin-top:24px;padding:0 16px 16px}.morning-home .section-h{margin:0 -16px;padding:16px 0 0}.morning-home p{margin:8px 0;font-size:14px}.morning-balance{font-size:48px;line-height:1.05;margin:18px 0 4px;font-weight:600;letter-spacing:-1px}
