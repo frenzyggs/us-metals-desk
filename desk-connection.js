@@ -71,10 +71,10 @@
   }
   function manifest(link) {
     return idb("read", undefined, "manifest").then(saved => {
-      const previous = saved || new URL("manifest.json", import.meta.url).href;
+      const previous = typeof saved === "string" && saved.trim().startsWith("{") ? saved : new URL("manifest.json", document.getElementById("desk-connection").src).href;
       const response = new Response(previous, { headers: { "Content-Type": "application/manifest+json" } });
       return response.json();
-    }).catch(() => fetch(new URL("manifest.json", import.meta.url), { cache: "no-store" }).then(r => {
+    }).catch(() => fetch(new URL("manifest.json", document.getElementById("desk-connection").src), { cache: "no-store" }).then(r => {
       if (!r.ok) throw new Error("manifest unavailable");
       return r.json();
     })).then(doc => {
@@ -157,9 +157,14 @@
         const response = await fetch(`https://raw.githubusercontent.com/frenzyggs/us-metals-desk/data/d/${encodeURIComponent(values.d)}/state.json?_=${Date.now()}`, { cache: "no-store" });
         if (!response.ok) throw error("link", "The desk data could not be found. Check that you pasted the complete original link.");
         const envelope = await response.json();
-        const previousD = D, previousK = K;
+        const previousD = storage(false, D_KEY), previousK = storage(false, K_KEY);
         remember(values);
-        try { await decrypt(envelope); } catch (err) { D = previousD; K = previousK; cryptoKey = null; throw err; }
+        try { await decrypt(envelope); } catch (err) {
+          // Never leave a bad new link behind an older good connection.
+          if (previousD && previousK) remember({ d: previousD, k: previousK });
+          else { storage(true, D_KEY, null); storage(true, K_KEY, null); const backupDB = dbPromise; idb("delete").catch(() => {}); dbPromise = backupDB; }
+          D = null; K = null; cryptoKey = null; throw err;
+        }
         await manifest(values.full);
         if (location.hash) history.replaceState(null, "", location.pathname + location.search);
         await restore();
@@ -184,6 +189,7 @@
     revokeManifest();
     if (location.hash) history.replaceState(null, "", location.pathname + location.search);
     showConnect();
+    setTimeout(() => { const input = document.getElementById("desk-link"); if (input && /iPad|iPhone|iPod/.test(navigator.userAgent || "")) input.blur(); }, 0);
   }
   window.DeskConnection = {
     parse: parseLink,
@@ -193,7 +199,7 @@
     initialize(handler) {
       onConnect = handler;
       // Manifest JSON is cached alongside the shell, so Blob creation never needs network.
-      fetch(new URL("manifest.json", import.meta.url), { cache: "no-store" })
+      fetch(new URL("manifest.json", document.getElementById("desk-connection").src), { cache: "no-store" })
         .then(r => { if (!r.ok) throw new Error("manifest unavailable"); return r.text(); })
         .then(text => idb("write", text, "manifest")).catch(() => {});
       // Read raw fragment once before replacing it; never include credentials in strings shown to users.

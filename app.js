@@ -512,7 +512,7 @@
   // Draw the missing-connection UI immediately; never expose the key in an error.
   connected = storageHasSavedConnection();
   C.initialize(connectFromPastedLink).then(recovered => {
-    if (!recovered) return;
+    if (!recovered) { connected = false; C.showConnect(); return; }
     D = C.d; K = C.k; connected = true;
     poll();
   }).catch(() => { connected = false; C.showConnect(); });
