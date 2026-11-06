@@ -111,6 +111,8 @@
     return TIME_PARTS.formatToParts(new Date(ts * 1000)).reduce((o,p) => (o[p.type]=p.value,o),{});
   }
   function fmtTime(ts) {
+    if (ts == null || ts === "") return "–";
+    if (typeof ts === "string" && /^[0-9]{4}-/.test(ts)) return Number.isFinite(Date.parse(ts)) ? new Date(Date.parse(ts)).toLocaleString("en-GB", { timeZone: "Europe/Amsterdam", year:"numeric",day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).replace(",", " ·") + " AMS" : "–";
     if (!finite(ts)) return "–";
     let ms = Number(ts) < 1e12 ? Number(ts)*1000 : Number(ts);
     if (typeof ts === "string" && /^[0-9]{4}-/.test(ts)) ms = Date.parse(ts);
@@ -407,6 +409,9 @@
       view.innerHTML = emptyPage(missing ? (s.type === "auditor" ? "No audit yet" : "No symbol data yet") : (dataState() === "decrypt" ? "Cannot decrypt symbol data" : "Detail unavailable"),
         missing ? (s.type === "auditor" ? `${s.symbol} was stopped before Auditor, or Auditor has not run yet. No layers have been invented.` : `${s.symbol} has no persisted quote or bar snapshot yet.`) : "The desk could not provide this detail. Try again without losing the rest of your snapshot.",
         `<button class="btn" data-act="retry-detail">Try again</button>`); return;
+    }
+    if (s.data && s.data.error) {
+      view.innerHTML = emptyPage("Audit data unavailable", "The saved audit could not be read. No layer result has been substituted."); return;
     }
     if (s.type === "symbol") renderSymbol(s);
     else renderAuditor(s);
