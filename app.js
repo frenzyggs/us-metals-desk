@@ -75,10 +75,8 @@
   const onPages = /github\.io$/i.test(location.hostname);
   function fileUrl(f) {
     const q = "?_=" + Date.now();
-    if (onPages) {
-      return GH_RAW + "d/" + encodeURIComponent(D) + "/" + f + q;
-    }
-    return new URL("d/" + encodeURIComponent(D) + "/" + f + q, new URL("./", location.href)).toString();
+    // Plan B: encrypted payloads always live on the orphan `data` branch.
+    return GH_RAW + "d/" + encodeURIComponent(D) + "/" + f + q;
   }
   let _cryptoKey = null;
   async function getKey() {
@@ -187,7 +185,7 @@
     const now = Date.now() / 1000;
     const stale = S.loaded && Number.isFinite(S.lastGood) &&
       (now - S.lastGood) > Math.max(STALE_AFTER_S, S.poll * 4);
-    const offline = !D || (onPages && !K) || S.error || stale;
+    const offline = !D || !K || S.error || stale;
     if (offline) {
       row.hidden = false;
       const n = Math.max(1, Math.ceil((S.nextPoll - Date.now()) / 1000));
