@@ -268,3 +268,17 @@ a.btn{height:52px}
   *,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important}
   .sk{animation:none}
 }
+
+/* Private desk recovery, also suitable for iOS standalone with no inherited storage. */
+.connect-screen{min-height:calc(100dvh - var(--navh) - var(--tabh) - 40px);display:flex;flex-direction:column;justify-content:center;padding:24px 0 48px}
+.connect-screen .empty-icon{font-size:56px;color:var(--ter);line-height:1}
+.connect-screen h1{font-family:var(--display);font-size:34px;font-weight:600;letter-spacing:-.5px;margin:20px 0 8px}
+.connect-screen>p{font-size:16px;color:var(--sec);margin:0 0 24px}
+.connect-screen form label{display:block;font-size:13px;color:var(--sec);margin:0 0 8px}
+#desk-link{display:block;width:100%;height:52px;background:var(--card);color:var(--text);border:1px solid transparent;border-radius:12px;padding:0 14px;font:16px/1.3 var(--textf)}
+#desk-link:focus{border-color:var(--cyan);outline:none}
+#desk-link::placeholder{color:var(--ter)}
+.connect-error{color:var(--red);font-size:15px;line-height:1.4;margin:12px 0 0}
+#connect-form .btn{margin-top:16px}
+#connect-form .btn:disabled{opacity:.55}
+#desk-link:disabled{opacity:.55}

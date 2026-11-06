@@ -9,7 +9,7 @@
 <meta name="theme-color" content="#000000">
 <meta name="referrer" content="no-referrer">
 <title>US Metals Desk</title>
-<link rel="manifest" href="manifest.json">
+<link rel="manifest" id="app-manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="stylesheet" href="app.css">
 </head>
@@ -55,6 +55,13 @@
   <h2 id="profile-title">TradingView</h2>
   <p>This handle is the desk display name, not a public broker profile or a broker login.</p>
   <button class="btn dialog-cancel" data-act="profile-close">Done</button>
+</dialog>
+<script type="module" src="desk-connection.js"></script>
+<dialog id="forget-dialog" class="dialog" aria-labelledby="forget-title">
+  <h2 id="forget-title">Forget this device?</h2>
+  <p>Remove this browser's private desk connection. The desk, its data and its PAPER mode are not changed.</p>
+  <button class="btn dialog-confirm" data-act="forget-confirm">Forget this device</button>
+  <button class="btn dialog-cancel" data-act="forget-cancel">Cancel</button>
 </dialog>
 <script src="chart.js"></script>
 <script src="app.js"></script>

@@ -22,69 +22,34 @@
   const compact = v => !finite(v) ? "–" : "$" + Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(Number(v));
   const clsPnl = v => finite(v) && Number(v) < 0 ? "red" : "green";
 
-  function appCookiePath() {
-    const p = location.pathname;
-    return (p.endsWith("/") ? p : p.replace(/[^/]+$/, "")) || "/";
+  // desk-connection.js runs first: keeps install fragment out of the visible URL,
+  // with per-device localStorage and IndexedDB recovery. Never render either value.
+  const C = window.DeskConnection;
+  let D = null, K = null, decryptionFailure = false;
+  let connected = !!storageHasSavedConnection();
+  function storageHasSavedConnection() {
+    try { return !!(localStorage.getItem("desk_us_d") && localStorage.getItem("desk_us_k")); } catch (_) { return false; }
   }
-  function readStore(k) { try { return localStorage.getItem(k); } catch (_) { return null; } }
-  function writeStore(k, v) { try { localStorage.setItem(k, v); } catch (_) {} }
-  function readCookie(n) {
-    for (const p of (document.cookie || "").split("; ")) {
-      if (p.startsWith(n + "=")) { try { return decodeURIComponent(p.slice(n.length + 1)); } catch (_) { return null; } }
-    }
-    return null;
-  }
-  function rememberD(d) {
-    if (!d) return;
-    writeStore(STORE_D, d);
-    const secure = location.protocol === "https:" ? "; Secure" : "";
-    document.cookie = STORE_D + "=" + encodeURIComponent(d) + "; Path=" + appCookiePath() + "; Max-Age=31536000; SameSite=Lax" + secure;
-  }
-  const hash = new URLSearchParams(location.hash.slice(1));
-  if (hash.get("d")) rememberD(hash.get("d"));
-  const D = hash.get("d") || readStore(STORE_D) || readCookie(STORE_D);
-  const K = hash.get("k") || null;
-  if (D && !hash.get("d")) history.replaceState(null, "", location.pathname + location.search + "#d=" + encodeURIComponent(D) + (K ? "&k=" + encodeURIComponent(K) : ""));
-
-  function b64ToBytes(s) {
-    try {
-      const pad = "=".repeat((4 - (s.length % 4)) % 4);
-      const bin = atob((s + pad).replace(/-/g, "+").replace(/_/g, "/"));
-      return Uint8Array.from(bin, c => c.charCodeAt(0));
-    } catch (_) { throw Object.assign(new Error("invalid key"), { kind: "decrypt" }); }
-  }
-  let cryptoKey = null;
-  async function getKey() {
-    if (!D) throw Object.assign(new Error("Private desk link required"), { kind: "missing" });
-    if (!K) throw Object.assign(new Error("Decryption key required"), { kind: "key" });
-    if (!cryptoKey) {
-      try { cryptoKey = await crypto.subtle.importKey("raw", b64ToBytes(K), "AES-GCM", false, ["decrypt"]); }
-      catch (_) { throw Object.assign(new Error("invalid key"), { kind: "key" }); }
-    }
-    return cryptoKey;
-  }
+  function connectionError(kind, message) { return Object.assign(new Error(message), { kind }); }
   async function get(file) {
     const url = GH_RAW + "d/" + encodeURIComponent(D) + "/" + file + "?_=" + Date.now();
     let response;
     try { response = await fetch(url, { cache: "no-store" }); }
-    catch (_) { throw Object.assign(new Error("Network unavailable"), { kind: "network" }); }
-    if (!response.ok) throw Object.assign(new Error("Data request returned " + response.status), { kind: "http", status: response.status });
+    catch (_) { throw connectionError("network", "Network unavailable"); }
+    if (!response.ok) throw Object.assign(connectionError("http", "Data request returned " + response.status), { status: response.status });
     let envelope;
     try { envelope = await response.json(); }
-    catch (_) { throw Object.assign(new Error("Invalid data response"), { kind: "data" }); }
-    if (!envelope || envelope.v !== 1 || !envelope.n || !envelope.c) {
-      throw Object.assign(new Error("Encrypted data expected"), { kind: "decrypt" });
+    catch (_) { throw connectionError("data", "Invalid data response"); }
+    try { return await C.decrypt(envelope); }
+    catch (e) {
+      if (e.kind === "decrypt") decryptionFailure = true;
+      throw e;
     }
-    try {
-      const iv = b64ToBytes(envelope.n), ct = b64ToBytes(envelope.c);
-      const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, await getKey(), ct);
-      return JSON.parse(new TextDecoder().decode(pt));
-    } catch (_) { throw Object.assign(new Error("Decryption failed"), { kind: "decrypt" }); }
   }
   async function optional(file) { try { return await get(file); } catch (e) { if (e.status === 404) return null; throw e; } }
 
   const S = {
-    loaded: false, error: null, lastGood: null, lastSuccess: null, nextPoll: 0, poll: 60,
+    loaded: false, error: null, lastGood: null, lastSuccess: null, nextPoll: 0, poll: 60, connecting: false,
     state: null, chart: null, activity: null, account: null, settings: null, decisions: {},
     range: "LIVE", tab: "home", screen: null, screenRequest: 0, liveDialog: false,
   };
@@ -122,6 +87,8 @@
   }
 
   async function poll() {
+    if (!connected || !D || !K) { renderStatus(); render(); return; }
+    decryptionFailure = false;
     try {
       const st = await get("state.json");
       S.poll = finite(st.poll_seconds) ? Math.max(15, Number(st.poll_seconds)) : 60;
@@ -146,8 +113,7 @@
   }
 
   function dataState() {
-    if (!D) return "no-link";
-    if (!K) return "missing-key";
+    if (!connected || !D || !K) return "connect";
     if (S.error) return S.error.kind === "decrypt" || S.error.kind === "key" ? "decrypt" : "offline";
     const staleAfter = finite(S.state && S.state.stale_after_s) ? Number(S.state.stale_after_s) : 720;
     if (!S.loaded) return "loading";
@@ -156,11 +122,11 @@
   }
   function renderStatus() {
     const row = $("error-row"), snap = $("snapshot-row"), state = dataState();
+    if (state === "connect") { row.hidden = true; snap.hidden = true; return; }
     row.className = "error-row" + (state === "stale" ? " stale" : "");
     const messages = {
-      "no-link": "No desk data · open the private link supplied by the desk.",
-      "missing-key": "Cannot decrypt · the private link's key is missing. Open the full link again.",
-      decrypt: "Cannot decrypt desk data · check that the full private link, including its key, was used.",
+      connect: "",
+      decrypt: "Cannot decrypt this saved link · use Connect another device below to reconnect.",
       offline: "Desk offline · showing the last available snapshot; retrying automatically.",
       stale: "Data stale · the publisher has not sent a fresh heartbeat. Last snapshot remains visible.",
     };
@@ -182,12 +148,16 @@
     document.querySelectorAll(".tab").forEach(b => b.classList.toggle("on", b.dataset.tab === S.tab && !S.screen));
     $("nav-avatar").textContent = (handle()[0] || "V").toUpperCase();
     $("nav-back").hidden = !S.screen;
-    if (S.screen) { renderDetail(); return; }
-    if (dataState() === "no-link" || dataState() === "missing-key") {
-      view.innerHTML = emptyPage("Private desk link required", "Ask the desk for the full private link. Do not share its decryption key."); return;
+    if (!connected || !D || !K) {
+      C.showConnect();
+      return;
     }
+    if (!S.loaded && decryptionFailure) {
+      C.showConnect("Cannot decrypt this saved link. Paste the complete original private link again, or use Connect another device."); return;
+    }
+    if (S.screen) { renderDetail(); return; }
     if (!S.loaded && S.error) {
-      const decrypt = dataState() === "decrypt";
+      const decrypt = false;
       const noData = S.error.status === 404;
       view.innerHTML = emptyPage(decrypt ? "Cannot open encrypted data" : noData ? "No desk data yet" : "Desk data unavailable",
         decrypt ? "The link may be incomplete or its key may be wrong. No market values have been substituted." : noData ? "The publisher has not created a snapshot here. No prices, audits or fills have been substituted." : "The desk could not be reached. Retry, or come back when the publisher is online.",
@@ -348,7 +318,10 @@
       ${settingGroup("Desk", set.desk)}${settingGroup("Data", set.data)}${settingGroup("Session", set.session_windows)}
       ${settingGroup("Scanner", set.scanner)}${settingGroup("Auditor", set.auditor)}${settingGroup("Analyst", set.analyst)}
       ${settingGroup("Executor", set.executor)}${settingGroup("Risk", set.risk)}
-      <p class="note">Settings are never changed by this app. Tap any value or mode to see the chat command reminder.</p></div>`;
+      ${settingGroup("This device", {})}
+      <div class="group"><button class="row link" data-act="reconnect"><div class="main"><div class="t">Connect another device</div><div class="s">Paste a private desk link; does not erase this link</div></div><span class="chevron">›</span></button>
+      <button class="row link" data-act="forget"><div class="main"><div class="t red">Forget this device</div><div class="s">Remove the saved private link from this browser</div></div></button></div>
+      <p class="note">Settings are never changed by this app. Your private connection is stored only on this device and can be removed here.</p></div>`;
   }
 
   function openLiveDialog() {
@@ -472,6 +445,18 @@
     setTimeout(next, 120);
   }
 
+  async function connectFromPastedLink() {
+    D = C.d; K = C.k; connected = true;
+    S.error = null; decryptionFailure = false;
+    renderStatus(); render();
+    poll();
+  }
+  async function forgetDevice() {
+    $("forget-dialog").close();
+    await C.forget();
+    D = null; K = null; connected = false; C.resetKey();
+    location.reload();
+  }
   document.addEventListener("click", async e => {
     if (e.target.closest("[data-external]")) { e.stopPropagation(); return; }
     const t = e.target.closest("[data-tab],[data-go],[data-act],[data-range],[data-symbol],[data-audit],[data-bar]");
@@ -500,6 +485,10 @@
     else if (t.dataset.act === "readonly") toast(PLAN_B);
     else if (t.dataset.act === "profile") openProfile();
     else if (t.dataset.act === "profile-close") $("profile-dialog").close();
+    else if (t.dataset.act === "reconnect") { S.reconnect = true; C.showConnect(); }
+    else if (t.dataset.act === "forget") $("forget-dialog").showModal();
+    else if (t.dataset.act === "forget-cancel") $("forget-dialog").close();
+    else if (t.dataset.act === "forget-confirm") await forgetDevice();
     else if (t.dataset.act === "retry") location.reload();
     else if (t.dataset.act === "retry-detail") { S.screen.loading = true; S.screen.error = null; render(); loadScreenData(S.screen); }
   });
@@ -520,5 +509,12 @@
   $("profile-dialog").addEventListener("click", e => { if (e.target === $("profile-dialog")) $("profile-dialog").close(); });
   addEventListener("resize", () => { if (S.screen && S.screen.data) render(); });
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
-  renderStatus(); poll();
+  // Draw the missing-connection UI immediately; never expose the key in an error.
+  connected = storageHasSavedConnection();
+  C.initialize(connectFromPastedLink).then(recovered => {
+    if (!recovered) return;
+    D = C.d; K = C.k; connected = true;
+    poll();
+  }).catch(() => { connected = false; C.showConnect(); });
+  renderStatus(); if (connected) poll();
 })();
