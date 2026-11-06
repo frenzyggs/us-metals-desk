@@ -153,7 +153,6 @@
       try {
         // Validate before committing and clearing the secure fragment.
         values = parseLink(input.value, location.href);
-        const parsed = new URL(values.full);
         const response = await fetch(`https://raw.githubusercontent.com/frenzyggs/us-metals-desk/data/d/${encodeURIComponent(values.d)}/state.json?_=${Date.now()}`, { cache: "no-store" });
         if (!response.ok) throw error("link", "The desk data could not be found. Check that you pasted the complete original link.");
         const envelope = await response.json();

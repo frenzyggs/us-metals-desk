@@ -25,6 +25,7 @@
   // desk-connection.js runs first: keeps install fragment out of the visible URL,
   // with per-device localStorage and IndexedDB recovery. Never render either value.
   const C = window.DeskConnection;
+  if (!C) { document.getElementById("view").textContent = "Connection module could not start. Reload the app."; return; }
   let D = null, K = null, decryptionFailure = false;
   let connected = !!storageHasSavedConnection();
   function storageHasSavedConnection() {
