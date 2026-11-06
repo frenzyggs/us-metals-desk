@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="US Metals Desk">
+<meta name="theme-color" content="#000000">
+<meta name="referrer" content="no-referrer">
+<title>US Metals Desk</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header class="navbar" id="navbar">
+  <button class="avatar tap" id="nav-avatar" aria-label="Account">V</button>
+  <button class="nav-title tap" id="nav-title">Grok Bot ›</button>
+  <div class="nav-right">
+    <button class="icon tap" id="nav-search" aria-label="Search">
+      <svg viewBox="0 0 24 24" width="22" height="22"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M15.5 15.5 21 21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
+    <button class="icon tap" id="nav-bell" aria-label="Notifications">
+      <svg viewBox="0 0 24 24" width="22" height="22"><path d="M6 17V11a6 6 0 0 1 12 0v6l1.5 2h-15z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M10 21h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <span class="dot" id="bell-dot" hidden></span>
+    </button>
+  </div>
+</header>
+<div class="error-row" id="error-row" hidden></div>
+<p class="snapshot-row" id="snapshot-row" hidden></p>
+<div class="search-bar" id="search-bar" hidden>
+  <input id="search-input" type="search" placeholder="Symbol or ticker" autocomplete="off" autocapitalize="characters" spellcheck="false">
+  <ul id="search-results" class="rows"></ul>
+</div>
+<main id="view"></main>
+<div class="toast" id="toast" hidden></div>
+<nav class="tabbar" id="tabbar">
+  <button class="tab tap" data-tab="home"><svg viewBox="0 0 24 24"><path d="M3 11 12 4l9 7v9h-6v-6H9v6H3z" fill="currentColor"/></svg><span>Home</span></button>
+  <button class="tab tap" data-tab="agents"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="2" fill="currentColor"/><rect x="13" y="3" width="8" height="8" rx="2" fill="currentColor"/><rect x="3" y="13" width="8" height="8" rx="2" fill="currentColor"/><rect x="13" y="13" width="8" height="8" rx="2" fill="currentColor"/></svg><span>Agents</span></button>
+  <button class="tab tap" data-tab="activity"><svg viewBox="0 0 24 24"><path d="M3 12h4l3-7 4 14 3-7h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg><span>Activity</span></button>
+  <button class="tab tap" data-tab="account"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" fill="currentColor"/><path d="M4 21a8 8 0 0 1 16 0z" fill="currentColor"/></svg><span>Account</span></button>
+</nav>
+<script src="chart.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
