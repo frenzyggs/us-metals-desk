@@ -34,7 +34,7 @@
   function drawLine(canvas, points, marks, opts, k, mk, fresh) {
     const { c, w, h } = setup(canvas);
     const top = 84, bottom = h - 12;
-    if (!points || points.length === 0) {           // empty: dashed start line only
+    if (!points || points.length < 2) { // no history line until two real snapshots exist
       c.strokeStyle = C.ter; c.setLineDash([4, 4]); c.lineWidth = 1;
       c.beginPath(); c.moveTo(0, (top + bottom) / 2); c.lineTo(w, (top + bottom) / 2); c.stroke(); c.setLineDash([]);
       return;
@@ -87,8 +87,29 @@
     c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath();
   }
 
-  // ---- Coin candles: 1-minute OHLC [t,o,h,l,c,volume_m5]; volume bar = change of volume.m5
+  const candleState = new WeakMap();
+  function exitY(cs, exitLine, h) {
+    if (exitLine == null) return null;
+    const vh = 50, top = 10, bottom = h - vh - 10;
+    const vals = cs.flatMap(k => [k[2],k[3],exitLine]);
+    let lo = Math.min(...vals), hi = Math.max(...vals);
+    if (hi === lo) { hi *= 1.01; lo *= .99; }
+    return bottom - (exitLine-lo)/(hi-lo)*(bottom-top);
+  }
+  // ---- Candles: Yahoo OHLC [t,o,h,l,c,volume], no synthetic bars.
   function candles(canvas, cs, exitLine) {
+    const previous = candleState.get(canvas) || { n: 0 };
+    const t0 = performance.now();
+    const frame = now => {
+      const reveal = previous.n && cs && cs.length > previous.n && !reduced() ? Math.min(1,(now-t0)/250) : 1;
+      drawCandles(canvas,cs,exitLine,reveal);
+      if (reveal < 1) requestAnimationFrame(frame);
+    };
+    candleState.set(canvas, { n: (cs || []).length });
+    requestAnimationFrame(frame);
+  }
+
+  function drawCandles(canvas, cs, exitLine, reveal) {
     const { c, w, h } = setup(canvas);
     const vh = 50, top = 10, bottom = h - vh - 10;
     if (!cs || !cs.length) {
@@ -99,16 +120,16 @@
     let lo = Math.min(...vals), hi = Math.max(...vals); if (hi === lo) { hi *= 1.01; lo *= 0.99; }
     const Y = v => bottom - (v - lo) / (hi - lo) * (bottom - top);
     const n = cs.length, step = w / Math.max(n, 20), bw = Math.max(2, step * 0.6);
-    const dv = cs.map((k, i) => i && k[5] != null && cs[i - 1][5] != null ? Math.max(0, k[5] - cs[i - 1][5]) : 0);
-    const vmax = Math.max(1, ...dv);
+    const vmax = Math.max(1, ...cs.map(k => Number(k[5]) || 0));
     cs.forEach((k, i) => {
       const x = w - (n - i) * step + step / 2, up = k[4] >= k[1], col = up ? C.green : C.red;
+      c.globalAlpha = reveal;
       c.strokeStyle = col; c.fillStyle = col; c.lineWidth = 1;
       c.beginPath(); c.moveTo(x, Y(k[2])); c.lineTo(x, Y(k[3])); c.stroke();
       const yo = Y(k[1]), yc = Y(k[4]);
       c.fillRect(x - bw / 2, Math.min(yo, yc), bw, Math.max(1, Math.abs(yc - yo)));
-      const vb = dv[i] / vmax * (vh - 4);
-      c.globalAlpha = 0.5; c.fillRect(x - bw / 2, h - 4 - vb, bw, vb); c.globalAlpha = 1;
+      const vb = (Number(k[5]) || 0) / vmax * (vh - 4);
+      c.globalAlpha = 0.5 * reveal; c.fillRect(x - bw / 2, h - 4 - vb, bw, vb); c.globalAlpha = 1;
     });
     if (exitLine != null) {   // orange dashed "Risk trailing stop" at the current exit line
       c.strokeStyle = C.orange; c.setLineDash([6, 4]); c.lineWidth = 1.5;

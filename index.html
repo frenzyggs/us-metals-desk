@@ -16,6 +16,7 @@
 <body>
 <header class="navbar" id="navbar">
   <button class="avatar tap" id="nav-avatar" aria-label="Account">V</button>
+  <button class="back tap" id="nav-back" hidden aria-label="Back to Activity">‹ Activity</button>
   <button class="nav-title tap" id="nav-title">Grok Bot ›</button>
   <div class="nav-right">
     <button class="icon tap" id="nav-search" aria-label="Search">
@@ -41,6 +42,20 @@
   <button class="tab tap" data-tab="activity"><svg viewBox="0 0 24 24"><path d="M3 12h4l3-7 4 14 3-7h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg><span>Activity</span></button>
   <button class="tab tap" data-tab="account"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" fill="currentColor"/><path d="M4 21a8 8 0 0 1 16 0z" fill="currentColor"/></svg><span>Account</span></button>
 </nav>
+<dialog id="live-dialog" class="dialog" aria-labelledby="live-title">
+  <h2 id="live-title">Confirm LIVE</h2>
+  <p>Type <strong>LIVE</strong> exactly. On Plan B this cannot change desk mode; it returns to PAPER.</p>
+  <label class="dialog-label" for="live-input">Confirmation</label>
+  <input class="dialog-input" id="live-input" placeholder="Type LIVE" autocomplete="off" autocapitalize="characters" spellcheck="false">
+  <p class="dialog-error red" id="live-error" hidden>Type LIVE exactly to confirm.</p>
+  <button class="btn dialog-confirm" data-act="live-confirm">Confirm LIVE</button>
+  <button class="btn dialog-cancel" data-act="live-cancel">Cancel</button>
+</dialog>
+<dialog id="profile-dialog" class="dialog" aria-labelledby="profile-title">
+  <h2 id="profile-title">TradingView</h2>
+  <p>This handle is the desk display name, not a public broker profile or a broker login.</p>
+  <button class="btn dialog-cancel" data-act="profile-close">Done</button>
+</dialog>
 <script src="chart.js"></script>
 <script src="app.js"></script>
 </body>
